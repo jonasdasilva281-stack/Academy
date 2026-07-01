@@ -705,7 +705,7 @@ textarea.fi{resize:vertical;min-height:60px}
   <div class="mh"><div class="mt">📦 Novo Produto</div><span class="mx" onclick="cm('produto')">✕</span></div>
   <div class="fg"><label class="fl">Nome</label><input class="fi" id="pd-nome"></div>
   <div class="fg"><label class="fl">Nome curto</label><input class="fi" id="pd-nomec"></div>
-  <div class="fr fg"><div><label class="fl">Valor (€)</label><input type="number" class="fi" id="pd-valor"></div><div><label class="fl">Tipo</label><select class="fi" id="pd-tipo"><option value="unico">Único</option><option value="recorrente">Recorrente</option></select></div></div>
+  <div class="fr fg"><div><label class="fl">Valor (€)</label><input type="number" class="fi" id="pd-valor-input"></div><div><label class="fl">Tipo</label><select class="fi" id="pd-tipo"><option value="unico">Único</option><option value="recorrente">Recorrente</option></select></div></div>
   <div class="fg"><label class="fl">Descrição</label><input class="fi" id="pd-desc"></div>
   <button class="btn bp" style="width:100%" onclick="saveProduto()">Criar</button>
 </div></div>
@@ -1585,10 +1585,11 @@ function finToggleMes(cid){
 /* ═══ PRODUTOS ═══ */
 function saveProduto(){
   const nome=document.getElementById('pd-nome').value.trim();
-  const valor=parseFloat(document.getElementById('pd-valor').value);
+  const valor=parseFloat(document.getElementById('pd-valor-input').value);
   if(!nome||!valor){toast('Preenche nome e valor','#C0392B');return;}
   DB.produtos.push({id:uid(),nome,nomeC:document.getElementById('pd-nomec').value||nome,valor,tipo:document.getElementById('pd-tipo').value,desc:document.getElementById('pd-desc').value});
-  ['pd-nome','pd-nomec','pd-valor','pd-desc'].forEach(id=>document.getElementById(id).value='');
+  ['pd-nome','pd-nomec','pd-desc'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('pd-valor-input').value='';
   save();cm('produto');renderAll();toast('✓ Produto criado');
 }
 function deleteProduto(id){ if(!confirm('Apagar?'))return; DB.produtos=DB.produtos.filter(p=>p.id!==id); save();renderAll(); }
