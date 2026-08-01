@@ -380,9 +380,7 @@ function useAcademyData(){
     return merged;
   }
   React.useEffect(()=>{(async()=>{try{const remote=await supaGet();if(remote){const merged=mergeWithSeed(remote);setDataState(merged);lastSaved.current=JSON.stringify(remote);}else{const seed=window.__academySeedData?window.__academySeedData():{};setDataState(seed);if(seed&&Object.keys(seed).length>0){await supaSet(seed);lastSaved.current=JSON.stringify(seed);}}setOnline(true);}catch(e){setError("Offline.");setOnline(false);setDataState(window.__academySeedData?window.__academySeedData():null);}finally{setLoading(false);}})();},[]);
-  React.useEffect(()=>{if(!data)return;const iv=setInterval(async()=>{try{const remote=await supaGet();if(remote){const s=JSON.stringify(remote);// Só actualiza se os dados remotos forem diferentes E mais recentes que o que guardámos
-if(s!==lastSaved.current){const remoteKeys=Object.keys(remote);const savedKeys=Object.keys(JSON.parse(lastSaved.current||'{}'));// Se o remoto tem menos campos que o guardado, ignorar (pode ser versão antiga)
-if(remoteKeys.length>=savedKeys.length){setDataState(mergeWithSeed(remote));lastSaved.current=s;}}}setOnline(true);}catch{setOnline(false);}},5000);return()=>clearInterval(iv);},[!!data]);
+  React.useEffect(()=>{if(!data)return;const iv=setInterval(async()=>{try{setOnline(true);}catch{setOnline(false);}},5000);return()=>clearInterval(iv);},[!!data]);
   const persist=React.useCallback(async(next)=>{setDataState(next);setSyncing(true);try{await supaSet(next);lastSaved.current=JSON.stringify(next);setOnline(true);}catch(e){setError("Falha ao guardar.");setOnline(false);}finally{setSyncing(false);};},[]);
   return{data,setData:persist,loading,error,syncing,online};
 }
