@@ -366,17 +366,17 @@ function useAcademyData(){
   const lastSaved=React.useRef(null);
   // Merge remoto com seed — garante campos novos sem perder dados existentes
   function mergeWithSeed(remote){
+    // NUNCA sobrescrever dados remotos — apenas adicionar campos novos que não existem
     const seed=window.__academySeedData?window.__academySeedData():{};
-    const merged={...seed,...remote};
-    // Campos que o seed tem mas o remoto pode não ter
-    if(!remote.acaoSocial) merged.acaoSocial=seed.acaoSocial||{doacoes:[]};
-    if(!remote.galeria) merged.galeria=seed.galeria||{formandas:[]};
-    if(!remote.stock) merged.stock=seed.stock||{categorias:[],produtos:[],movimentos:[]};
-    if(!remote.loja) merged.loja=seed.loja||{produtos:[],vendas:[],categorias:[]};
+    const merged={...remote};
+    // Adicionar apenas campos que não existem no remoto
+    if(!remote.acaoSocial) merged.acaoSocial={doacoes:[]};
+    if(!remote.galeria) merged.galeria={formandas:[]};
+    if(!remote.stock) merged.stock={categorias:["Géis & Acrílicos","Ferramentas","Decoração & Nail Art","Higiene & Cuidados","Embalagem","Material de escritório","Outro"],produtos:[],movimentos:[]};
+    if(!remote.loja) merged.loja={produtos:[],vendas:[],categorias:["Kits","Géis","Ferramentas","Decoração","Formação","Outro"]};
     if(!remote.acompanhamento) merged.acompanhamento={};
     if(!remote.sequencia) merged.sequencia=seed.sequencia||{passos_captacao:[],passos_pre_curso:[],passos_pos_curso:[],progresso:{}};
-    // Garantir sub-campos do financeiro
-    if(remote.finance&&!remote.finance.metaMensal) merged.finance={...remote.finance,metaMensal:0,metaAnual:0};
+    if(!remote.finance?.metaMensal && remote.finance) merged.finance={...remote.finance,metaMensal:0,metaAnual:0};
     return merged;
   }
   React.useEffect(()=>{(async()=>{try{const remote=await supaGet();if(remote){const merged=mergeWithSeed(remote);setDataState(merged);lastSaved.current=JSON.stringify(remote);}else{const seed=window.__academySeedData?window.__academySeedData():{};setDataState(seed);if(seed&&Object.keys(seed).length>0){await supaSet(seed);lastSaved.current=JSON.stringify(seed);}}setOnline(true);}catch(e){setError("Offline.");setOnline(false);setDataState(window.__academySeedData?window.__academySeedData():null);}finally{setLoading(false);}})();},[]);
