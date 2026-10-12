@@ -355,8 +355,11 @@ Star:Icon(["M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.1
 <script>
 const SUPA_URL="https://lluvisdkuuqxnaahuzuk.supabase.co";
 const SUPA_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxsdXZpc2RrdXVxeG5hYWh1enVrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIzOTQ0ODIsImV4cCI6MjA5Nzk3MDQ4Mn0.bxus8-oaNG8IwTdBU2ffUbCD44w8Bz1AsUCqCMPrpWI";
-async function supaGet(){const r=await fetch(SUPA_URL+"/rest/v1/academy_data?id=eq.main&select=data",{headers:{"apikey":SUPA_KEY,"Authorization":"Bearer "+SUPA_KEY}});if(!r.ok)throw new Error("GET "+r.status);const rows=await r.json();const d=rows.length&&rows[0].data;return(d&&d.finance&&d.finance.transactions&&d.sales&&d.cursos)?d:null;}
-async function supaSet(data){const r=await fetch(SUPA_URL+"/rest/v1/academy_data",{method:"POST",headers:{"apikey":SUPA_KEY,"Authorization":"Bearer "+SUPA_KEY,"Content-Type":"application/json","Prefer":"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({id:"main",data,updated_at:new Date().toISOString()})});if(!r.ok)throw new Error("SET "+r.status);}
+window.__remoteStamp=null;window.__loadFailed=false;
+async function supaStamp(){const r=await fetch(SUPA_URL+"/rest/v1/academy_data?id=eq.main&select=updated_at",{headers:{"apikey":SUPA_KEY,"Authorization":"Bearer "+SUPA_KEY},cache:"no-store"});if(!r.ok)throw new Error("STAMP "+r.status);const rows=await r.json();return rows.length?rows[0].updated_at:null;}
+async function supaGet(){const r=await fetch(SUPA_URL+"/rest/v1/academy_data?id=eq.main&select=data,updated_at",{headers:{"apikey":SUPA_KEY,"Authorization":"Bearer "+SUPA_KEY}});if(!r.ok)throw new Error("GET "+r.status);const rows=await r.json();if(rows.length)window.__remoteStamp=rows[0].updated_at;const d=rows.length&&rows[0].data;return(d&&d.finance&&d.finance.transactions&&d.sales&&d.cursos)?d:null;}
+async function supaSet(data){const stamp=new Date().toISOString();const r=await fetch(SUPA_URL+"/rest/v1/academy_data",{method:"POST",headers:{"apikey":SUPA_KEY,"Authorization":"Bearer "+SUPA_KEY,"Content-Type":"application/json","Prefer":"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({id:"main",data,updated_at:stamp})});if(!r.ok)throw new Error("SET "+r.status);window.__remoteStamp=stamp;}
+const mesmoCarimbo=(a,b)=>!!a&&!!b&&Date.parse(a)===Date.parse(b);
 function useAcademyData(){
   const[data,setDataState]=React.useState(null);
   const[loading,setLoading]=React.useState(true);
@@ -383,10 +386,24 @@ function useAcademyData(){
     if(!remote.finance?.metaMensal && remote.finance) merged.finance={...remote.finance,metaMensal:0,metaAnual:0};
     return merged;
   }
-  React.useEffect(()=>{(async()=>{try{const remote=await supaGet();if(remote){const merged=mergeWithSeed(remote);setDataState(merged);lastSaved.current=JSON.stringify(remote);}else{const seed=window.__academySeedData?window.__academySeedData():{};setDataState(seed);if(seed&&Object.keys(seed).length>0){await supaSet(seed);lastSaved.current=JSON.stringify(seed);}}setOnline(true);}catch(e){setError("Offline.");setOnline(false);setDataState(window.__academySeedData?window.__academySeedData():null);}finally{setLoading(false);}})();},[]);
-  React.useEffect(()=>{if(!data)return;const iv=setInterval(async()=>{try{setOnline(true);}catch{setOnline(false);}},5000);return()=>clearInterval(iv);},[!!data]);
+  React.useEffect(()=>{(async()=>{try{const remote=await supaGet();if(remote){const merged=mergeWithSeed(remote);setDataState(merged);lastSaved.current=JSON.stringify(remote);}else{const seed=window.__academySeedData?window.__academySeedData():{};setDataState(seed);if(seed&&Object.keys(seed).length>0){await supaSet(seed);lastSaved.current=JSON.stringify(seed);}}setOnline(true);}catch(e){window.__loadFailed=true;setError("Sem ligação à base de dados — recarregue a página. Nada será gravado até lá.");setOnline(false);setDataState(window.__academySeedData?window.__academySeedData():null);}finally{setLoading(false);}})();},[]);
+  const busyRef=React.useRef(false);const chainRef=React.useRef(Promise.resolve());
+  // De 20 em 20 segundos: se outro dispositivo gravou, carrega a versão mais recente
+  React.useEffect(()=>{if(!data)return;const iv=setInterval(async()=>{if(busyRef.current||window.__loadFailed)return;try{const st=await supaStamp();setOnline(true);if(busyRef.current)return;if(window.__remoteStamp&&st&&!mesmoCarimbo(st,window.__remoteStamp)){const remote=await supaGet();if(remote&&!busyRef.current){const m=mergeWithSeed(remote);dataRef.current=m;setDataState(m);lastSaved.current=JSON.stringify(remote);}}}catch{setOnline(false);}},20000);return()=>clearInterval(iv);},[!!data]);
   const dataRef=React.useRef(null);dataRef.current=data;
-  const persist=React.useCallback(async(nextOrFn)=>{const next=typeof nextOrFn==="function"?nextOrFn(dataRef.current):nextOrFn;dataRef.current=next;setDataState(next);setSyncing(true);try{await supaSet(next);lastSaved.current=JSON.stringify(next);setOnline(true);}catch(e){setError("Falha ao guardar.");setOnline(false);}finally{setSyncing(false);};},[]);
+  const persist=React.useCallback((nextOrFn)=>{
+    if(window.__loadFailed){setError("Sem ligação à base de dados — recarregue a página antes de gravar.");return Promise.resolve();}
+    const next=typeof nextOrFn==="function"?nextOrFn(dataRef.current):nextOrFn;dataRef.current=next;setDataState(next);
+    // grava uma de cada vez e nunca por cima de uma versão mais recente gravada noutro dispositivo
+    chainRef.current=chainRef.current.then(async()=>{busyRef.current=true;setSyncing(true);try{
+      const st=await supaStamp();
+      if(window.__remoteStamp&&st&&!mesmoCarimbo(st,window.__remoteStamp)){
+        const remote=await supaGet();if(remote){const m=mergeWithSeed(remote);dataRef.current=m;setDataState(m);lastSaved.current=JSON.stringify(remote);}
+        setError("⚠️ Os dados foram alterados noutro dispositivo. Carreguei a versão mais recente — repita a última alteração.");return;}
+      await supaSet(dataRef.current);lastSaved.current=JSON.stringify(dataRef.current);setOnline(true);setError(null);
+    }catch(e){setError("Falha ao guardar.");setOnline(false);}finally{busyRef.current=false;setSyncing(false);}});
+    return chainRef.current;
+  },[]);
   return{data,setData:persist,loading,error,syncing,online};
 }
 </script>
